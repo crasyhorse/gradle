@@ -1,0 +1,527 @@
+= Gradle basics
+:doctype: article
+:pdf-theme: {docdir}/pdf/theme.yml
+:pdf-fontsdir: /usr/share/fonts/truetype/dejavu
+
+* Init the project
+** Create the file `settings.gradle.kts`
++
+[source,kotlin]
+----
+rootProject.name = "unit-converter-gradle"
+include("converter-core", "converter-cli")
+----
++
+** **unit-converter-gradle** is the root project's name
+** `converter-core` and `converter-cli` are the names of subprojects
+*** This works because the subproject's names and the names of their subdirectories match
+** Run `gradle wrapper`
+*** This installs the Gradle wrapper into the project
+*** This is necessary so that everyone uses the same version of Gradle
+** Open `gradle/wrapper/gradle-wrapper.properties` and look at `distributionUrl`
+** Run `./gradlew projects`
+** Rename `converter-cli` project to `unit-converter-cli`
++
+[source,kotlin]
+----
+rootProject.name = "unit-converter-gradle"
+include("converter-core", "unit-converter-cli")
+
+project(":unit-converter-cli").projectDir = file("converter-cli")
+----
++
+** Run `./gradlew projects`
+*** `converter-cli` is now `unit-converter-cli`
+** Look at both subprojects
+*** `unit-converter-cli` is an application
+*** `converter-core` is a library
+** Add a `build.gradle.kts` in `./converter-cli`
++
+[source,kotlin]
+----
+plugins {
+    application
+}
+----
++
+*** Plugins provide reusable common functionality
+*** They add tasks, configurations, and DSL extensions (e.g. for Spring Boot)
+*** Plugins can be used in the `settings.gradle.kts` file as well as in all `build.gradle.kts` files
+*** There are core, community and local plugins https://docs.gradle.org/current/userguide/plugin_reference.html#header[Gradle Plugin Reference]
+** Add a `build.gradle.kts` in `./converter-core`
++
+[source,kotlin]
+----
+plugins {
+    `java-library`
+}
+----
++
+<<<
++
+** Run `./gradlew tasks --all`
+*** There is a `unit-converter-cli:run` task at the top of the list
+*** Comment out the settings in `./converter-cli/build.gradle.kts`
+*** Re-run `./gradlew tasks --all`
+*** The `unit-converter-cli:run` task is gone
+*** Remove the comments in `./converter-cli/build.gradle.kts`
+** Each subproject has its own tasks
+*** Run the `converter-core:jar` task `./gradlew :converter-core:jar`
+** Show the Gradle integration in VSCode
+** Add the `./gradle.properties` file
++
+[source,kotlin]
+----
+org.gradle.console=verbose
+----
++
+*** Run the `converter-core:jar` task again
+** Look at the `./converter-core/build` directory (Output)
++
+<<<
+
+* Tasks & dependencies
+** Each task has Inputs, Actions and Outputs
+*** Explain that **UP-TO-DATE** means that the existing outputs do not have changed and are reused
+*** Execute the `converter-core:cleanJar` tasks
+*** The `cleanJar` task deletes the JAR task's outputs. The next execution of jar must recreate them
+*** Re-execute the `converter-core:jar` task
+** Configure the `compileJava` task
++
+[source,kotlin]
+----
+import org.gradle.api.tasks.compile.JavaCompile
+
+plugins {
+    `java-library`
+}
+
+tasks.named<JavaCompile>("compileJava"){
+    this.options.compilerArgs.add("-parameters")
+}
+----
++
+*** This tells the Java compiler to store method parameter names in the generated .class files
+*** To find existing options enter **JavaCompile** into the search
+*** Re-execute the `converter-core:jar` task
+*** The **UP-TO-DATE** should be gone
+*** This shows that not only files but also configuration is input
+*** There are missing dependencies, e.g. JUnit
+*** Add the missing dependencies to `./converter-core/build.gradle.kts`
++
+[source,kotlin]
+----
+dependencies {
+    testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+----
++
+*** Java uses two classpaths, `runtime-classpath` and `compile-classpath`
+*** `testImplementation` moves a package into the `compile-classpath` and the `runtime-classpath`
+*** `testRuntimeOnly` moves a package into the `runtime-classpath`
+** Configure the JUnit Platfom Launcher
++
+[source,kotlin]
+----
+import org.gradle.api.tasks.testing.Test
+...
+tasks.named<Test>("test") {
+    useJUnitPlatform()
+}
+----
++
+<<<
++
+** Run task `:converter-core:test`
++
+[source]
+----
+...
+FAILURE: Build failed with an exception.
+* What went wrong:
+Execution failed for task ':converter-core:compileTestJava' (registered by plugin class 'org.gradle.api.plugins.JavaBasePlugin').
+> Could not resolve all files for configuration ':converter-core:testCompileClasspath'.
+   > Cannot resolve external dependency org.junit.jupiter:junit-jupiter:5.11.4 because no repositories are defined.
+...
+----
++
+*** Add the Dependency configuration to `settings.gradle.kts`
++
+[source,kotlin]
+----
+dependencyResolutionManagement {
+    repositories {
+        mavenCentral()
+    }
+}  
+----
++
+*** Run `:converter-core:cleanTest`
++
+<<<
++
+** Add another dependency to the `converter-core` app
++
+[source,kotlin]
+----
+dependencies {
+    testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
+    implementation("org.apache.commons:commons-lang3:3.22.0")
+}
+----
++
+** Add a dependency to the `converter-cli` app
++
+[source,kotlin]
+----
+dependencies {
+    implementation(project(":converter-core"))
+    runtimeOnly("com.h2database:h2:2.5.252")
+}
+----
++
+<<<
++
+** Talk about versions in Gradle
+*** `2.5.252` : Requests 2.5.252. A higher version can be selected during dependency conflict resolution.
+*** `2.5.+` : Dynamically selects the latest available 2.5.x version, unless conflict resolution selects a higher version.
+*** `2.5.252!!` : Strictly requires version 2.5.252.
+*** `version { strictly("[2.5, 2.6[") prefer("2.5.252") }` : Gradle may use a version `>= 2.5 & < 2.6`. If `2.5.252` is available it is the preferred version.
++
+*** Execute the `converter-core:cleanCompileJava` task
+** Subprojects can define their own dependency repositories
++
+[source,kotlin]
+----
+repositories {
+    mavenCentral()
+}
+----
++
+*** Repositories should be configured centrally
+*** Modify the `dependencyResolutionManagement` to suppress repository configurations in subprojects
++
+[source,kotlin]
+----
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+      ...
+}   
+----
++
+<<<
++
+*** Re-execute the `converter-core:cleanCompileJava` task
++
+[source]
+----
+FAILURE: Build failed with an exception.
+
+* Where:
+Build file '/workspaces/gradle/converter-core/build.gradle.kts' line: 9
+
+* What went wrong:
+Build was configured to prefer settings repositories over project repositories but repository 'MavenRepo' was added by build file 'converter-core/build.gradle.kts'
+----
++
+*** Remove the `repositories` block from `./converter-core/build.gradle.kts`
++
+<<<
+
+* Plugins
+** Add a plugin to `settings.gradle.kts` at the top of the `settings.gradle.kts` file
++
+[source,kotlin]
+----
+plugins {
+    id("io.github.ben-manes.versions") version "0.67.0"
+}
+----
++
+*** Add the Plugin configuration to `settings.gradle.kts`
++
+[source,kotlin]
+----
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}   
+----
++
+*** Execute the `dependencyUpdates` task
++
+<<<
++
+** Create `./build.gradle.kts`
++
+[source,kotlin]
+----
+import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
+
+tasks.withType<DependencyUpdatesTask>().configureEach {
+    revision = "release"
+    rejectPreReleases = true
+    checkForGradleUpdate = true
+    gradleReleaseChannel = "current"
+}
+----
++
+*** Show only stable Gradle updates (`checkForGradleUpdate = true` & `gradleReleaseChannel = "current"`)
+*** Show only non-pre-releases (`revision = "release"` & `rejectPreReleases = true`)
+*** `tasks.named...` configures the specific tasks identified by its name
+*** `tasks.withType...` configures all tasks with the given type
+*** `.configureEach` : registers a configuration action that executes when a matching task is realized
+*** `.all` : eagerly realizes and configures matching tasks, including tasks that might not be needed for the requested build
+*** Re-execute the `dependencyUpdates` task
++
+<<<
+
+* Version catalog
+** Create `gradle/libs.versions.toml`
++
+[source,toml]
+----
+[versions]
+junit = "5.11.4"
+commons-lang3 = "3.22.0"
+h2 = "2.5.252"
+----
++
+*** These are reusable versions
+*** Add the `libraries` block
++
+[source,toml]
+----
+[libraries]
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+commons-lang3 = { module = "org.apache.commons:commons-lang3", version.ref = "commons-lang3" }
+h2 = { module = "com.h2database:h2", version.ref = "h2" }
+----
++
+<<<
++
+** Modify `./converter-core/build.gradle.kts`
++
+[source,kotlin]
+----
+dependencies {
+    testImplementation(libs.junit.jupiter)
+    testRuntimeOnly(libs.junit.platform.launcher)
+    implementation(libs.commons.lang3)
+}
+----
++
+** Modify `./converter-cli/build.gradle.kts`
++
+[source,kotlin]
+----
+dependencies {
+    implementation(project(":converter-core"))
+    runtimeOnly(libs.h2)
+}
+----
++
+<<<
++
+** Demonstrate bundles
+*** Add the `org.apache.commons:commons-text` library
++
+[source,toml]
+----
+[versions]
+junit = "5.11.4"
+commons-lang3 = "3.22.0"
+commons-text = "1.14.0"
+h2 = "2.5.252"
+
+[libraries]
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+commons-lang3 = { module = "org.apache.commons:commons-lang3", version.ref = "commons-lang3" }
+commons-text = { module = "org.apache.commons:commons-text", version.ref = "commons-text" }
+
+h2 = { module = "com.h2database:h2", version.ref = "h2" }
+----
++
+<<<
++
+*** Create a bundle `apache-commons`
++
+[source,toml]
+----
+[bundles]
+apache-commons = ["commons-lang3", "commons-text"]
+----
+*** Modify `./converter-core/build.gradle.kts`
++
+[source,kotlin]
+----
+dependencies {
+    testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
+    implementation(libs.bundles.commons)
+}
+----
++
+<<<
+
+* Authoring custom tasks
+** Create a simple Hello World task in the root `build.gradle.kts`
++
+[source,kotlin]
+----
+tasks.register("helloWorld") {
+    group = "Custom"
+    description = "Prints Hello World"
+}
+----
++
+** Create a custom task type `HelloWorld`
++
+[source,kotlin]
+----
+import org.gradle.api.DefaultTask
+import org.gradle.api.tasks.TaskAction
+...
+abstract class HelloWorld : DefaultTask() {
+
+    @TaskAction
+    fun greet() {
+        println("Hello World!")
+    }
+}
+----
++
+<<<
++
+** Annotate the custom task
++
+[source,kotlin]
+----
+tasks.register<HelloWorld>("helloWorld") {
+----
++
+*** Execute the `helloWorld` task
+*** Execute the `tasks` task. It shows informations about the `helloWorld` task
+** Refactor the `HelloWorld` task type
++
+[source,kotlin]
+----
+import org.gradle.api.tasks.Input
+...
+abstract class SayHello : DefaultTask() {
+
+    @get:Input
+    var myName: String = "Florian"
+
+    @TaskAction
+    fun greet() {
+        println("Hello $myName")
+    }
+}
+----
++
+<<<
++
+** Refactor the `helloWorld` task
++
+[source,kotlin]
+----
+tasks.register<SayHello>("sayHello") {
+    group = "Custom"
+    description = "Prints Hello World"
+}
+----
++
+*** `@get:Input` tells Gradle that `myName` is an input for the `sayHello` task
+** Refactor to write the greeting into a file
++
+[source,kotlin]
+----
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.tasks.OutputFile
+
+abstract class SayHello : DefaultTask() {
+
+    @get:Input
+    var myName: String = "Florian"
+
+    @get:OutputFile
+    abstract val greetingFile: RegularFileProperty
+----
++
+<<<
++
+[source,kotlin]
+----
+    @TaskAction
+    fun greet() {
+        val greeting = "Hello $myName"
+        val output = greetingFile.get().asFile
+
+        output.parentFile.mkdirs()
+        output.writeText(greeting)
+
+        println(greeting)
+    }
+}
+
+tasks.register<SayHello>("sayHello") {
+    group = "Custom"
+    description = "Writes a personal greeting to a file"
+
+    greetingFile.set(
+        layout.buildDirectory.file("greeting.txt")
+    )
+}
+----
++
+<<<
++
+** Explain Properties
+*** Attendees should look at `val output = greetingFile.get().asFile` and `greetingFile.set(`
+*** `greetingFile` is a Property
+*** A Gradle `Property<T>` is a container for a value of type `T`.
+*** Properties support lazy evaluation (a value does not have to be calculated or retrieved when it is configured)
+** Explain build phases
+*** Gradle executes a build in three phases **Initialization**, **Configuration** and **Execution**
+*** In **Initialization** Gradle reads `settings.gradle.kts`, Determines the root project and its subprojects, Configures build-level settings such as plugin and dependency repositories
+*** In **Configuration** Gradle evaluates the relevant `build.gradle.kts` files, Registers and configures tasks, Determines the task graph for the requested execution
+*** In **Execution** Gradle executes the required task actions, Tasks can be skipped if they are `UP-TO-DATE`, Tasks are executed according to their dependencies
+** Demonstrate the phases
+*** Run `./gradlew help --info`
++
+<<<
++
+** Back to the last example
+*** In **Configuration** phase the task type and the `tasks.register` is evaluated
+*** The `greetingFile` is access in this phase but it does not exist yet
+*** The property works a some kind of container for the file
+*** In **Execution** phase the `greetingFile` property is accessed via its `get()` method.
+*** At this point in time the property get evaluated (the file exists)
+** The layout helper provides access to Gradle-managed project locations, such as `projectDirectory` and `buildDirectory`
+** Create a task that executes Linux shell commands
++
+[source,kotlin]
+----
+import org.gradle.api.tasks.Exec
+...
+tasks.register<Exec>("linuxInfo") {
+    group = "Custom"
+    description = "Displays Linux system information"
+
+    commandLine(
+        "bash", "-c",
+        "echo 'Kernel:' && uname -s && "
+    )
+}
+----
++

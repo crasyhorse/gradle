@@ -1,0 +1,10 @@
+{
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "gradle.autoDetect": "off",
+    "java.gradle.buildServer.enabled": "off",
+    "asciidoc.pdf.asciidoctorPdfCommandArgs": [
+        "-r",
+        "/workspaces/gradle/docs/.asciidoctor/lib/list_colors.rb"
+    ],
+    "asciidoc.pdf.asciidoctorPdfCommandPath": "/usr/bin/asciidoctor-pdf"
+}
