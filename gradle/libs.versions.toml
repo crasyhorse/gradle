@@ -1,0 +1,15 @@
+[versions]
+junit = "5.11.4"
+commons-lang3 = "3.22.0"
+commons-text = "1.14.0"
+h2 = "2.5.252"
+
+[libraries]
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+commons-lang3 = { module = "org.apache.commons:commons-lang3", version.ref = "commons-lang3" }
+commons-text = { module = "org.apache.commons:commons-text", version.ref = "commons-text" }
+h2 = { module = "com.h2database:h2", version.ref = "h2" }
+
+[bundles]
+apache-commons = ["commons-lang3", "commons-text"]
